@@ -321,7 +321,7 @@ class TorchConstrainedZonotope(object):
 
     def isEmpty(self, method='scipy'):
         cz = ConstrainedZonotope(self.c.cpu().detach().numpy(), self.G.cpu().detach().numpy(), self.A.cpu().detach().numpy(), self.b.cpu().detach().numpy())
-        return cz.isEmpty()
+        return cz.isEmpty(method)
 
 
 
