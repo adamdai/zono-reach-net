@@ -3,7 +3,8 @@ import torch
 import cvxpy as cp
 from cvxpylayers.torch import CvxpyLayer
 
-from .NN_con_zono import forward_pass_NN_torch
+from .LReL_NN_conzono import forward_pass_NN_torch
+from .NN_controller_dynamics_reach import forward_pass_NN_controller_dynamics_torch
 
 def center_param_collision_check(c_out_tch, G_out, obstacle):
     """ Center-parameterized Collision Check 
@@ -105,7 +106,7 @@ def torch_collision_check(Z_out, Z_obs):
     return v_opt
 
 
-def NN_constraint_step(Z_in, Z_obs, net, con_opt):
+def NN_constraint_step(Z_in, Z_obs, net, con_opt, negative_slope=0):
     """ NN Constraint Step
 
     Compute the forward pass of an input zonotope thru a network, then evaluate the 
@@ -120,7 +121,7 @@ def NN_constraint_step(Z_in, Z_obs, net, con_opt):
     """
     con_opt.zero_grad()
 
-    Z_out = forward_pass_NN_torch(Z_in, net)
+    Z_out = forward_pass_NN_torch(Z_in, net, negative_slope)
 
     losses = []
 
@@ -128,7 +129,7 @@ def NN_constraint_step(Z_in, Z_obs, net, con_opt):
         v = torch_collision_check(z, Z_obs)
         if v <= 1: # in collision
             print("in collision")
-            loss = torch.square(1 - v)
+            loss = 1 - v
             losses.append(loss)
 
     if losses:
@@ -150,4 +151,22 @@ def NN_constraint_step(Z_in, Z_obs, net, con_opt):
     # loss2.backward(retain_graph=True) # backprop
     # con_opt.step()
 
+def dynamic_NN_constraint_step(Z_in, Z_obs, net, x_star, u_star, dNN_weights, dNN_biases, delta_t, con_opt, c_a=0, d_a=0):
+    con_opt.zero_grad()
 
+    Z_out = forward_pass_NN_controller_dynamics_torch(Z_in, net, x_star, u_star, dNN_weights, dNN_biases, delta_t, c_a, d_a)
+
+    losses = []
+
+    for z in Z_out:
+        v = torch_collision_check(z, Z_obs)
+        if v <= 1: # in collision
+            print("in collision")
+            loss = 1 - v
+            losses.append(loss)
+
+    if losses:
+        total_loss = sum(losses)
+        print('loss: ', total_loss)
+        total_loss.backward() # backprop
+        con_opt.step()

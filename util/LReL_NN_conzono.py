@@ -11,43 +11,6 @@ networks. This code is for LReL networks instead.
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-
-# def emptiness_check(f_cost, A_ineq, b_ineq, A_eq, b_eq):
-#     # x_cvx = cvx.Variable((f_cost.shape[0], 1))
-#     # cost = np.transpose(f_cost) @ x_cvx
-#     # constraints = [A_ineq @ x_cvx <= b_ineq, A_eq @ x_cvx == b_eq]
-#     # problem = cvx.Problem(cvx.Minimize(cost), constraints)
-#     # problem.solve()
-#     # x = x_cvx.value
-#     # return x[-1]
-#     res = linprog(f_cost, A_ineq, b_ineq, A_eq, b_eq, (None, None))
-#     return res.x[-1]
-#
-#
-# def make_con_zono_empty_check_LP(A, b):
-#     """
-#     Given the constraint matrices A and b for a constrained zonotope, return the data matrices required to construct a
-#     linear program to solve for emptiness check of the constrained zonotope.
-#     """
-#     # Dimension of problem
-#     d = A.shape[1]
-#
-#     # Cost
-#     f_cost = np.zeros((d, 1))
-#     f_cost = np.concatenate((f_cost, np.eye(1)), axis=0)
-#
-#     # Inequality cons
-#     A_ineq = np.concatenate((-np.eye(d), -np.ones((d, 1))), axis=1)
-#     A_ineq = np.concatenate((A_ineq, np.concatenate((np.eye(d), -np.ones((d, 1))), axis=1)), axis=0)
-#     b_ineq = np.zeros((2 * d, 1))
-#
-#     # Equality cons
-#     A_eq = np.concatenate((A, np.zeros((A.shape[0], 1))), axis=1)
-#     b_eq = b
-#
-#     return f_cost, A_ineq, b_ineq, A_eq, b_eq
-
-
 def n_tuple(n, a):
     """
     Returns a list of n-tuple over the set {1, a}.
@@ -149,7 +112,9 @@ def LReL_con_zono_single(Z_in, negative_slope=0):
         if n_con > 0:
             A_i = np.concatenate((np.concatenate((A, np.zeros((n_con, n))), axis=1), A_i), axis=0)
 
-        Z_out.append(ConstrainedZonotope(c_i, G_i, A_i, b_i))
+        Z_i = ConstrainedZonotope(c_i, G_i, A_i, b_i)
+        if not Z_i.isEmpty():
+            Z_out.append(Z_i)
 
     return Z_out
 

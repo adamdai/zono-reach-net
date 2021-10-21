@@ -3,9 +3,11 @@ import torch
 import matplotlib.pyplot as plt
 from scipy.linalg import block_diag
 from scipy.linalg import null_space
+from scipy.optimize import linprog
 from util.zonotope import Zonotope
 from matplotlib.patches import Polygon
 import pypoman
+import cvxpy as cvx
 
 class ConstrainedZonotope(object):
     """ Constrained Zonotope
@@ -179,6 +181,43 @@ class ConstrainedZonotope(object):
         # update ax.viewLim using the new dataLim
         ax.autoscale_view()
 
+    def isEmpty(self, method='scipy'):
+        A = self.A
+        b = self.b
+
+        # Dimension of problem
+        d = A.shape[1]
+
+        # Cost
+        f_cost = np.zeros((d, 1))
+        f_cost = np.concatenate((f_cost, np.eye(1)), axis=0)
+
+        # Inequality cons
+        A_ineq = np.concatenate((-np.eye(d), -np.ones((d, 1))), axis=1)
+        A_ineq = np.concatenate((A_ineq, np.concatenate((np.eye(d), -np.ones((d, 1))), axis=1)), axis=0)
+        b_ineq = np.zeros((2 * d, 1))
+
+        # Equality cons
+        A_eq = np.concatenate((A, np.zeros((A.shape[0], 1))), axis=1)
+        b_eq = b
+
+        if method == 'scipy':
+            res = linprog(f_cost, A_ineq, b_ineq, A_eq, b_eq, (None, None))
+            x = res.x
+        elif method == 'cvxpy':
+            x_cvx = cvx.Variable((f_cost.shape[0], 1))
+            cost = np.transpose(f_cost) @ x_cvx
+            constraints = [A_ineq @ x_cvx <= b_ineq, A_eq @ x_cvx == b_eq]
+            problem = cvx.Problem(cvx.Minimize(cost), constraints)
+            problem.solve()
+            x = x_cvx.value
+        else:
+            raise Exception('Invalid method!')
+
+        if x[-1] <= 1:
+            return False
+        return True
+
 
 #### --------------- PYTORCH VERSION ----------------- ####
 
@@ -279,6 +318,12 @@ class TorchConstrainedZonotope(object):
         else:
             cz = ConstrainedZonotope(self.c.cpu().detach().numpy(), self.G.cpu().detach().numpy())
         cz.plot(ax, color, alpha)
+
+    def isEmpty(self, method='scipy'):
+        cz = ConstrainedZonotope(self.c.cpu().detach().numpy(), self.G.cpu().detach().numpy(), self.A.cpu().detach().numpy(), self.b.cpu().detach().numpy())
+        return cz.isEmpty()
+
+
 
 def rownormalize(A, b):
     normsA = np.sqrt(np.sum(np.square(A), axis=1))
